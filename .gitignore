@@ -1,0 +1,116 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Virtual environments and local Python installs
+.venv/
+venv/
+env/
+ENV/
+.env/
+.python-version
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+
+# Dependency and packaging output
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Reinforcement learning outputs
+models/
+checkpoints/
+runs/
+wandb/
+tensorboard/
+logs/
+training_logs/
+videos/
+recordings/
+replays/
+results/
+experiments/
+
+# Saved model and training artifact files
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.npz
+*.npy
+
+# Generated plots, metrics, and reports
+plots/
+figures/
+metrics/
+*.csv
+*.tsv
+*.jsonl
+
+# Pygame, media, and runtime artifacts
+screenshots/
+captures/
+*.bmp
+*.wav
+*.mp4
+*.avi
+*.mov
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS and filesystem clutter
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows clutter
+Thumbs.db
+Desktop.ini
+
+# Linux clutter
+*~
+.directory
+
+# Local scratch files
+tmp/
+temp/
+scratch/
+*.log
