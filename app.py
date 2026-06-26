@@ -69,33 +69,36 @@ if 'training_running' not in st.session_state:
 # Render application UI
 if not st.session_state.training_started:
     # ------------------ LANDING / HOME PAGE ------------------
-    st.title("🐍 Snake Reinforcement Learning")
-    st.caption("Train a Deep Q-Network (DQN) agent to play Snake in real-time in your browser")
-    st.divider()
-    
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        with st.container(border=True):
-            st.subheader("Project Overview")
-            st.write(
-                "This project demonstrates **Deep Q-Learning** applied to the classic game of Snake. "
-                "Instead of hardcoding rules, the snake learns how to navigate the board, locate food, and avoid self/wall collisions "
-                "by optimizing weights in a PyTorch Neural Network."
-            )
-            st.divider()
-            st.subheader("Key Elements of the AI:")
-            st.markdown("""
-            *   **State Representation**: 11-dimensional binary vector representing danger (left, right, straight), moving direction, and food direction.
-            *   **Action Vector**: Relative moves: `[1,0,0]` (straight), `[0,1,0]` (turn right), `[0,0,1]` (turn left).
-            *   **Experience Replay**: Two levels of memory (Short-term after every step, Long-term random batch optimization of 1000 experiences on game-over).
-            """)
-        
-        st.write("")
-        st.write("")
-        if st.button("Train Model", use_container_width=True, type="primary"):
-            st.session_state.training_started = True
-            st.session_state.training_running = True
-            st.rerun()
+    home_placeholder = st.empty()
+    with home_placeholder.container():
+        st.title("🐍 Snake Reinforcement Learning")
+        st.caption("Train a Deep Q-Network (DQN) agent to play Snake in real-time in your browser")
+        st.divider()
+
+        col_l, col_c, col_r = st.columns([1, 2, 1])
+        with col_c:
+            with st.container(border=True):
+                st.subheader("Project Overview")
+                st.write(
+                    "This project demonstrates **Deep Q-Learning** applied to the classic game of Snake. "
+                    "Instead of hardcoding rules, the snake learns how to navigate the board, locate food, and avoid self/wall collisions "
+                    "by optimizing weights in a PyTorch Neural Network."
+                )
+                st.divider()
+                st.subheader("Key Elements of the AI:")
+                st.markdown("""
+                *   **State Representation**: 11-dimensional binary vector representing danger (left, right, straight), moving direction, and food direction.
+                *   **Action Vector**: Relative moves: `[1,0,0]` (straight), `[0,1,0]` (turn right), `[0,0,1]` (turn left).
+                *   **Experience Replay**: Two levels of memory (Short-term after every step, Long-term random batch optimization of 1000 experiences on game-over).
+                """)
+
+            st.write("")
+            st.write("")
+            if st.button("Train Model", use_container_width=True, type="primary"):
+                home_placeholder.empty()
+                st.session_state.training_started = True
+                st.session_state.training_running = True
+                st.rerun()
 
 else:
     # ------------------ TRAINING DASHBOARD ------------------
