@@ -102,7 +102,7 @@ if not st.session_state.training_started:
 
 else:
     # ------------------ TRAINING DASHBOARD ------------------
-    st.title("🐍 Training Dashboard")
+    st.title("Training Dashboard")
     
     # Metrics display bar
     stats_placeholder = st.empty()
@@ -112,15 +112,15 @@ else:
     ctrl_col1, ctrl_col2, ctrl_col3 = st.columns(3)
     with ctrl_col1:
         if st.session_state.training_running:
-            if st.button("⏸️ Pause Training", use_container_width=True):
+            if st.button("Pause Training", use_container_width=True):
                 st.session_state.training_running = False
                 st.rerun()
         else:
-            if st.button("▶️ Resume Training", use_container_width=True, type="primary"):
+            if st.button("Resume Training", use_container_width=True, type="primary"):
                 st.session_state.training_running = True
                 st.rerun()
     with ctrl_col2:
-        if st.button("🔄 Reset Training", use_container_width=True):
+        if st.button("Reset Training", use_container_width=True):
             # Reset agent, game, and metrics
             st.session_state.agent = Agent()
             st.session_state.game = SnakeGameAI()
@@ -132,7 +132,7 @@ else:
             st.session_state.training_running = False
             st.rerun()
     with ctrl_col3:
-        if st.button("🏠 Back to Home", use_container_width=True):
+        if st.button("Back to Home", use_container_width=True):
             st.session_state.training_started = False
             st.session_state.training_running = False
             st.rerun()
@@ -143,16 +143,16 @@ else:
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.subheader("🎮 Live Game Screen")
+        st.subheader("Game Screen")
         game_image_placeholder = st.empty()
         
     with col2:
-        st.subheader("📈 Training Metrics")
+        st.subheader("Training Metrics")
         chart_placeholder = st.empty()
 
     # Speed Slider at the bottom
     st.write("")
-    speed = st.slider("🐍 Snake Training Speed (Updates per Second)", min_value=1, max_value=250, value=60)
+    speed = st.slider("Snake Training Speed (Updates per Second)", min_value=1, max_value=250, value=60)
     
     # Training Loop Controller
     agent = st.session_state.agent
