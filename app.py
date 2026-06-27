@@ -42,26 +42,47 @@ def draw_chart(scores, mean_scores):
     plt.tight_layout()
     return fig
 
-# Render the current game state as a lightweight SVG string. This is far
-# cheaper than encoding a full 640x480 PNG every frame (which chokes on
-# Streamlit Cloud's single shared CPU core and slow websocket) — the SVG is
-# just a few KB of text that the browser draws natively, giving smooth motion.
-def game_to_svg(game):
+# Render the current game state as lightweight HTML divs. This is far cheaper
+# than encoding a full 640x480 PNG every frame (which chokes on Streamlit
+# Cloud's single shared CPU core and slow websocket) — it's just a few KB of
+# text the browser draws natively, giving smooth motion. We use positioned
+# <div>s rather than an <svg> because st.html sanitizes with DOMPurify's
+# html-only profile, which strips SVG elements but keeps styled divs.
+def game_to_html(game):
+    w, h = game.w, game.h
+    cell_w = BLOCK_SIZE / w * 100          # one cell as a % of board width
+    cell_h = BLOCK_SIZE / h * 100          # one cell as a % of board height
+    inner_w = 12 / w * 100                 # inner highlight square (matches pygame)
+    inner_h = 12 / h * 100
+    inner_dx = 4 / w * 100
+    inner_dy = 4 / h * 100
+
+    # padding-bottom keeps a bulletproof 4:3 (480/640) responsive box
     parts = [
-        f'<svg viewBox="0 0 {game.w} {game.h}" width="100%" '
-        f'style="background:#000;border-radius:8px;display:block;aspect-ratio:{game.w}/{game.h};">'
+        '<div style="position:relative;width:100%;padding-bottom:75%;'
+        'background:#000;border-radius:8px;overflow:hidden;">',
+        '<div style="position:absolute;top:6px;left:10px;color:#fff;'
+        'font-family:monospace;font-size:18px;font-weight:bold;z-index:2;">'
+        f'Score: {game.score}</div>',
     ]
     for pt in game.snake:
-        x, y = int(pt.x), int(pt.y)
-        parts.append(f'<rect x="{x}" y="{y}" width="20" height="20" fill="#0000ff"/>')
-        parts.append(f'<rect x="{x + 4}" y="{y + 4}" width="12" height="12" fill="#0064ff"/>')
-    fx, fy = int(game.food.x), int(game.food.y)
-    parts.append(f'<rect x="{fx}" y="{fy}" width="20" height="20" fill="#c80000"/>')
+        lx = pt.x / w * 100
+        ty = pt.y / h * 100
+        parts.append(
+            f'<div style="position:absolute;left:{lx:.3f}%;top:{ty:.3f}%;'
+            f'width:{cell_w:.3f}%;height:{cell_h:.3f}%;background:#0000ff;"></div>'
+        )
+        parts.append(
+            f'<div style="position:absolute;left:{lx + inner_dx:.3f}%;top:{ty + inner_dy:.3f}%;'
+            f'width:{inner_w:.3f}%;height:{inner_h:.3f}%;background:#0064ff;"></div>'
+        )
+    fx = game.food.x / w * 100
+    fy = game.food.y / h * 100
     parts.append(
-        f'<text x="6" y="26" fill="#fff" font-size="24" '
-        f'font-family="monospace">Score: {game.score}</text>'
+        f'<div style="position:absolute;left:{fx:.3f}%;top:{fy:.3f}%;'
+        f'width:{cell_w:.3f}%;height:{cell_h:.3f}%;background:#c80000;"></div>'
     )
-    parts.append('</svg>')
+    parts.append('</div>')
     return "".join(parts)
 
 class DummyClock:
@@ -218,8 +239,8 @@ else:
 
     # First frame rendering if paused
     if not st.session_state.training_running:
-        # Draw the current board as a lightweight SVG
-        game_image_placeholder.html(game_to_svg(game))
+        # Draw the current board as lightweight HTML
+        game_image_placeholder.html(game_to_html(game))
 
         # Display latest plot
         if len(st.session_state.plot_scores) > 0:
@@ -269,9 +290,9 @@ else:
         # 5. Remember
         agent.remember(state_old, final_move, reward, state_new, done)
 
-        # 6. Render the game frame every step as a lightweight SVG (cheap to
+        # 6. Render the game frame every step as lightweight HTML (cheap to
         # build and tiny to send, unlike PNG-encoding a full image each frame)
-        game_image_placeholder.html(game_to_svg(game))
+        game_image_placeholder.html(game_to_html(game))
 
         # 7. Metric widgets are heavier to push than the SVG, so refresh them
         # a few times a second rather than on every single frame
