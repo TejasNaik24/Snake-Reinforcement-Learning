@@ -217,6 +217,13 @@ else:
     # looking for an empty cell to place food on.
     total_cells = (game.w // BLOCK_SIZE) * (game.h // BLOCK_SIZE)
 
+    # Training runs every step as fast as the CPU allows (no sleep) so it
+    # isn't throttled by slower/variable cloud hardware. Rendering is paced
+    # separately on a fixed wall-clock interval so the visual speed stays
+    # steady regardless of how irregular the backend compute timing is.
+    render_interval = 1.0 / speed
+    last_render_time = 0.0
+
     # Active running loop
     while st.session_state.training_running:
         if len(game.snake) >= total_cells - 1:
@@ -226,28 +233,29 @@ else:
 
         # 1. Get old state
         state_old = agent.get_state(game)
-        
+
         # 2. Get action
         final_move = agent.get_action(state_old)
-        
+
         # 3. Perform action
         reward, done, score = game.play_step(final_move)
         state_new = agent.get_state(game)
-        
+
         # 4. Train short memory
         agent.train_short_memory(state_old, final_move, reward, state_new, done)
-        
+
         # 5. Remember
         agent.remember(state_old, final_move, reward, state_new, done)
-        
-        # 6. Render game frame
-        img = pygame.surfarray.array3d(game.display)
-        img = np.transpose(img, (1, 0, 2))
-        game_image_placeholder.image(img, use_container_width=True)
-        
-        # 7. Render metrics
-        update_metrics_display(score)
-        
+
+        # 6. Render game frame + metrics, paced to render_interval
+        now = time.time()
+        if now - last_render_time >= render_interval:
+            img = pygame.surfarray.array3d(game.display)
+            img = np.transpose(img, (1, 0, 2))
+            game_image_placeholder.image(img, use_container_width=True)
+            update_metrics_display(score)
+            last_render_time = now
+
         if done:
             game.reset()
             agent.n_games += 1
@@ -270,9 +278,6 @@ else:
             fig = draw_chart(st.session_state.plot_scores, st.session_state.plot_mean_scores)
             chart_placeholder.pyplot(fig)
             plt.close(fig)
-
-        # Control sleep for training speed control
-        time.sleep(1.0 / speed)
 
     if st.session_state.game_won:
         show_win_dialog()
