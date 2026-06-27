@@ -178,7 +178,7 @@ else:
 
     # Speed Slider at the bottom
     st.write("")
-    speed = st.slider("Snake Training Speed (Updates per Second)", min_value=1, max_value=250, value=60)
+    speed = st.slider("Snake Speed (Frames per Second)", min_value=1, max_value=30, value=15)
     
     # Training Loop Controller
     agent = st.session_state.agent
@@ -217,15 +217,18 @@ else:
     # looking for an empty cell to place food on.
     total_cells = (game.w // BLOCK_SIZE) * (game.h // BLOCK_SIZE)
 
-    # Training runs every step as fast as the CPU allows (no sleep) so it
-    # isn't throttled by slower/variable cloud hardware. Rendering is paced
-    # separately on a fixed wall-clock interval so the visual speed stays
-    # steady regardless of how irregular the backend compute timing is.
-    render_interval = 1.0 / speed
-    last_render_time = 0.0
+    # One training step is rendered per frame, so on screen the snake always
+    # advances exactly one cell instead of teleporting forward. Each frame is
+    # paced to a steady wall-clock budget. Streamlit Cloud can only stream a
+    # limited number of full game images per second over its websocket, which
+    # is why the slider is capped to a rate the connection can sustain smoothly.
+    target_frame_time = 1.0 / speed
+    last_metrics_time = 0.0
 
     # Active running loop
     while st.session_state.training_running:
+        frame_start = time.time()
+
         if len(game.snake) >= total_cells - 1:
             st.session_state.game_won = True
             st.session_state.training_running = False
@@ -247,14 +250,16 @@ else:
         # 5. Remember
         agent.remember(state_old, final_move, reward, state_new, done)
 
-        # 6. Render game frame + metrics, paced to render_interval
-        now = time.time()
-        if now - last_render_time >= render_interval:
-            img = pygame.surfarray.array3d(game.display)
-            img = np.transpose(img, (1, 0, 2))
-            game_image_placeholder.image(img, use_container_width=True)
+        # 6. Render the game frame every step for smooth one-cell movement
+        img = pygame.surfarray.array3d(game.display)
+        img = np.transpose(img, (1, 0, 2))
+        game_image_placeholder.image(img, use_container_width=True)
+
+        # 7. Metric widgets are heavier to push than the image, so refresh them
+        # a few times a second rather than on every single frame
+        if frame_start - last_metrics_time >= 0.2:
             update_metrics_display(score)
-            last_render_time = now
+            last_metrics_time = frame_start
 
         if done:
             game.reset()
@@ -278,6 +283,13 @@ else:
             fig = draw_chart(st.session_state.plot_scores, st.session_state.plot_mean_scores)
             chart_placeholder.pyplot(fig)
             plt.close(fig)
+
+        # Pace each frame to a steady cadence; subtract the time already spent
+        # this iteration so a costly step (e.g. end-of-game training) doesn't
+        # compound into the next frame's delay.
+        elapsed = time.time() - frame_start
+        if elapsed < target_frame_time:
+            time.sleep(target_frame_time - elapsed)
 
     if st.session_state.game_won:
         show_win_dialog()
