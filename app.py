@@ -3,11 +3,11 @@ import os
 os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 import streamlit as st
-import pygame
-import numpy as np
 import time
 import matplotlib.pyplot as plt
 
+# Importing game/agent below also imports pygame; the SDL dummy-driver env var
+# set above must stay before these imports so Pygame stays fully headless.
 from agent import Agent
 from game import SnakeGameAI, BLOCK_SIZE
 
@@ -41,6 +41,28 @@ def draw_chart(scores, mean_scores):
     ax.grid(color='#30363d', linestyle='--', alpha=0.5)
     plt.tight_layout()
     return fig
+
+# Render the current game state as a lightweight SVG string. This is far
+# cheaper than encoding a full 640x480 PNG every frame (which chokes on
+# Streamlit Cloud's single shared CPU core and slow websocket) — the SVG is
+# just a few KB of text that the browser draws natively, giving smooth motion.
+def game_to_svg(game):
+    parts = [
+        f'<svg viewBox="0 0 {game.w} {game.h}" width="100%" '
+        f'style="background:#000;border-radius:8px;display:block;aspect-ratio:{game.w}/{game.h};">'
+    ]
+    for pt in game.snake:
+        x, y = int(pt.x), int(pt.y)
+        parts.append(f'<rect x="{x}" y="{y}" width="20" height="20" fill="#0000ff"/>')
+        parts.append(f'<rect x="{x + 4}" y="{y + 4}" width="12" height="12" fill="#0064ff"/>')
+    fx, fy = int(game.food.x), int(game.food.y)
+    parts.append(f'<rect x="{fx}" y="{fy}" width="20" height="20" fill="#c80000"/>')
+    parts.append(
+        f'<text x="6" y="26" fill="#fff" font-size="24" '
+        f'font-family="monospace">Score: {game.score}</text>'
+    )
+    parts.append('</svg>')
+    return "".join(parts)
 
 class DummyClock:
     def tick(self, fps):
@@ -196,11 +218,9 @@ else:
 
     # First frame rendering if paused
     if not st.session_state.training_running:
-        # Convert Pygame display to array
-        img = pygame.surfarray.array3d(game.display)
-        img = np.transpose(img, (1, 0, 2))
-        game_image_placeholder.image(img, use_container_width=True)
-        
+        # Draw the current board as a lightweight SVG
+        game_image_placeholder.html(game_to_svg(game))
+
         # Display latest plot
         if len(st.session_state.plot_scores) > 0:
             fig = draw_chart(st.session_state.plot_scores, st.session_state.plot_mean_scores)
@@ -218,12 +238,11 @@ else:
     total_cells = (game.w // BLOCK_SIZE) * (game.h // BLOCK_SIZE)
 
     # One training step is rendered per frame, so on screen the snake always
-    # advances exactly one cell instead of teleporting forward. Each frame is
-    # paced to a steady wall-clock budget. Streamlit Cloud can only stream a
-    # limited number of full game images per second over its websocket, which
-    # is why the slider is capped to a rate the connection can sustain smoothly.
+    # advances exactly one cell instead of teleporting forward, and each frame
+    # is paced to a steady wall-clock budget set by the speed slider.
     target_frame_time = 1.0 / speed
     last_metrics_time = 0.0
+    last_chart_time = 0.0
 
     # Active running loop
     while st.session_state.training_running:
@@ -250,12 +269,11 @@ else:
         # 5. Remember
         agent.remember(state_old, final_move, reward, state_new, done)
 
-        # 6. Render the game frame every step for smooth one-cell movement
-        img = pygame.surfarray.array3d(game.display)
-        img = np.transpose(img, (1, 0, 2))
-        game_image_placeholder.image(img, use_container_width=True)
+        # 6. Render the game frame every step as a lightweight SVG (cheap to
+        # build and tiny to send, unlike PNG-encoding a full image each frame)
+        game_image_placeholder.html(game_to_svg(game))
 
-        # 7. Metric widgets are heavier to push than the image, so refresh them
+        # 7. Metric widgets are heavier to push than the SVG, so refresh them
         # a few times a second rather than on every single frame
         if frame_start - last_metrics_time >= 0.2:
             update_metrics_display(score)
@@ -279,10 +297,14 @@ else:
             mean_score = st.session_state.total_score / agent.n_games
             st.session_state.plot_mean_scores.append(mean_score)
             
-            # Re-draw plot
-            fig = draw_chart(st.session_state.plot_scores, st.session_state.plot_mean_scores)
-            chart_placeholder.pyplot(fig)
-            plt.close(fig)
+            # Re-draw plot, but throttle it: rendering a matplotlib figure
+            # encodes a PNG, which is expensive on the cloud's shared core, so
+            # we skip redraws that land within a second of the previous one.
+            if frame_start - last_chart_time >= 1.0:
+                fig = draw_chart(st.session_state.plot_scores, st.session_state.plot_mean_scores)
+                chart_placeholder.pyplot(fig)
+                plt.close(fig)
+                last_chart_time = frame_start
 
         # Pace each frame to a steady cadence; subtract the time already spent
         # this iteration so a costly step (e.g. end-of-game training) doesn't
