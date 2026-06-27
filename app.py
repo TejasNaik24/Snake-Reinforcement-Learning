@@ -9,7 +9,7 @@ import time
 import matplotlib.pyplot as plt
 
 from agent import Agent
-from game import SnakeGameAI
+from game import SnakeGameAI, BLOCK_SIZE
 
 # Set page config
 st.set_page_config(
@@ -46,6 +46,38 @@ class DummyClock:
     def tick(self, fps):
         pass
 
+def reset_training():
+    st.session_state.agent = Agent()
+    st.session_state.game = SnakeGameAI()
+    st.session_state.game.clock = DummyClock()
+    st.session_state.plot_scores = []
+    st.session_state.plot_mean_scores = []
+    st.session_state.total_score = 0
+    st.session_state.record = 0
+    st.session_state.training_running = False
+    st.session_state.game_won = False
+
+@st.dialog("The Snake Beat the Game!")
+def show_win_dialog():
+    agent = st.session_state.agent
+    st.write(
+        "The agent filled the entire board with its body — there's nowhere left "
+        "for food to spawn, which is the highest possible score in Snake."
+    )
+    m_col1, m_col2 = st.columns(2)
+    m_col1.metric("Final Score", st.session_state.record)
+    m_col2.metric("Games Played", agent.n_games)
+
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if st.button("Close", use_container_width=True):
+            st.session_state.game_won = False
+            st.rerun()
+    with btn_col2:
+        if st.button("Retrain", use_container_width=True, type="primary"):
+            reset_training()
+            st.rerun()
+
 # Initialize persistent session states
 if 'agent' not in st.session_state:
     st.session_state.agent = Agent()
@@ -65,6 +97,8 @@ if 'training_started' not in st.session_state:
     st.session_state.training_started = False
 if 'training_running' not in st.session_state:
     st.session_state.training_running = False
+if 'game_won' not in st.session_state:
+    st.session_state.game_won = False
 
 # Render application UI
 if not st.session_state.training_started:
@@ -80,9 +114,9 @@ if not st.session_state.training_started:
             with st.container(border=True):
                 st.subheader("Project Overview")
                 st.write(
-                    "This project demonstrates **Deep Q-Learning** applied to the classic game of Snake. "
-                    "Instead of hardcoding rules, the snake learns how to navigate the board, locate food, and avoid self/wall collisions "
-                    "by optimizing weights in a PyTorch Neural Network."
+                    "A **Deep Q-Learning** agent learning to play Snake completely from scratch — no hardcoded rules, "
+                    "just a PyTorch Neural Network figuring out through trial and error how to chase food, dodge walls, "
+                    "and avoid running into its own tail."
                 )
                 st.divider()
                 st.subheader("Key Elements of the AI:")
@@ -121,15 +155,7 @@ else:
                 st.rerun()
     with ctrl_col2:
         if st.button("Reset Training", use_container_width=True):
-            # Reset agent, game, and metrics
-            st.session_state.agent = Agent()
-            st.session_state.game = SnakeGameAI()
-            st.session_state.game.clock = DummyClock()
-            st.session_state.plot_scores = []
-            st.session_state.plot_mean_scores = []
-            st.session_state.total_score = 0
-            st.session_state.record = 0
-            st.session_state.training_running = False
+            reset_training()
             st.rerun()
     with ctrl_col3:
         if st.button("Back to Home", use_container_width=True):
@@ -185,8 +211,19 @@ else:
             
         update_metrics_display(0)
 
+    # Maximum cells on the board; if the snake's body fills all but one of
+    # them, the next food pickup would leave nowhere for food to spawn, so
+    # we declare victory here instead of letting game.py recurse forever
+    # looking for an empty cell to place food on.
+    total_cells = (game.w // BLOCK_SIZE) * (game.h // BLOCK_SIZE)
+
     # Active running loop
     while st.session_state.training_running:
+        if len(game.snake) >= total_cells - 1:
+            st.session_state.game_won = True
+            st.session_state.training_running = False
+            break
+
         # 1. Get old state
         state_old = agent.get_state(game)
         
@@ -236,3 +273,6 @@ else:
 
         # Control sleep for training speed control
         time.sleep(1.0 / speed)
+
+    if st.session_state.game_won:
+        show_win_dialog()
